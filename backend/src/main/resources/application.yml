@@ -27,3 +27,10 @@ server:
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
+
+farewatch:
+  collection:
+    # 수집 주기. 기본 6시간 (21_600_000 ms). 테스트/로컬에서 오버라이드 가능.
+    interval-ms: 21600000
+    # 출발일 오프셋 (today + N일). 스케줄러 sweep 마다 이 날짜들에 대해 스냅샷 수집.
+    target-day-offsets: 7,14,30
