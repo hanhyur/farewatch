@@ -64,11 +64,15 @@
 
 ## 모노레포 구조
 
+루트는 **Gradle 멀티 프로젝트** 이며 `backend` 를 서브프로젝트로 포함합니다. `gradlew` 래퍼와 `settings.gradle` 은 루트에 있고, 루트에서 모든 Gradle 태스크를 실행할 수 있습니다.
+
 ```
 farewatch/
-├── backend/                    Spring Boot 애플리케이션
+├── gradlew, gradlew.bat        Gradle wrapper (루트)
+├── gradle/wrapper/             wrapper jar + properties
+├── settings.gradle             rootProject.name + include 'backend'
+├── backend/                    Spring Boot 서브프로젝트
 │   ├── build.gradle
-│   ├── gradlew
 │   └── src/
 │       ├── main/java/com/farewatch/
 │       │   ├── FarewatchApplication.java
@@ -95,8 +99,8 @@ farewatch/
 
 ```bash
 git clone https://github.com/hanhyur/farewatch.git
-cd farewatch/backend
-./gradlew bootRun
+cd farewatch
+./gradlew :backend:bootRun
 ```
 
 기동 확인:
@@ -121,8 +125,11 @@ H2 콘솔 접속 정보:
 ### 테스트 실행
 
 ```bash
-cd backend
+# 루트에서 모든 서브프로젝트 테스트
 ./gradlew test
+
+# backend 만 콕 집어서
+./gradlew :backend:test
 ```
 
 ## REST API (계획)
@@ -220,8 +227,7 @@ git checkout -b feat/my-feature
 # - 리팩토링 (REFACTOR)
 
 # 3. 빌드 + 테스트 확인
-cd backend
-./gradlew build
+./gradlew :backend:build
 
 # 4. PR 생성 (dev 기준)
 ```
