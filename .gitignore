@@ -45,3 +45,6 @@ bin/
 ### AI / Claude (local workflow files, never committed) ###
 .claude/
 CLAUDE.md
+
+### Local development docs (never committed) ###
+docs/
