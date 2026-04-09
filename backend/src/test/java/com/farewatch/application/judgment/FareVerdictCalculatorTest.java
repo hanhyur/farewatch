@@ -2,6 +2,7 @@ package com.farewatch.application.judgment;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.within;
 
 import com.farewatch.domain.fare.FareStatistics;
 import com.farewatch.domain.judgment.FareVerdict;
@@ -44,23 +45,25 @@ class FareVerdictCalculatorTest {
             FareVerdict result = calculator.evaluate(178_000L, s);
 
             assertThat(result).isInstanceOf(FareVerdict.Insufficient.class);
-            FareVerdict.Insufficient insufficient = (FareVerdict.Insufficient) result;
-            assertThat(insufficient.sampleCount()).isEqualTo(10);
-            assertThat(insufficient.requiredCount()).isEqualTo(30);
+            if (result instanceof FareVerdict.Insufficient insufficient) {
+                assertThat(insufficient.sampleCount()).isEqualTo(10);
+                assertThat(insufficient.requiredCount()).isEqualTo(30);
+            }
             assertThat(result.kind()).isEqualTo(FareVerdictKind.INSUFFICIENT);
         }
 
         @Test
         @DisplayName("currentPrice << avg − 1σ → Cheap (zScore < -1.0)")
         void cheapWhenWellBelowOneSigma() {
-            // avg=200k, stdDev=20k → -1σ 경계 = 180k
+            // avg=200k, stdDev=20k → -1σ 경계 = 180k, 170k 는 확실히 그 아래
             FareVerdict result = calculator.evaluate(170_000L, defaultStats());
 
             assertThat(result).isInstanceOf(FareVerdict.Cheap.class);
-            FareVerdict.Cheap cheap = (FareVerdict.Cheap) result;
-            assertThat(cheap.currentPrice()).isEqualTo(170_000L);
-            assertThat(cheap.avgPrice()).isEqualTo(200_000L);
-            assertThat(cheap.zScore()).isEqualTo(-1.5);
+            if (result instanceof FareVerdict.Cheap cheap) {
+                assertThat(cheap.currentPrice()).isEqualTo(170_000L);
+                assertThat(cheap.avgPrice()).isEqualTo(200_000L);
+                assertThat(cheap.zScore()).isCloseTo(-1.5, within(1e-9));
+            }
             assertThat(result.kind()).isEqualTo(FareVerdictKind.CHEAP);
         }
 
@@ -76,14 +79,15 @@ class FareVerdictCalculatorTest {
         @Test
         @DisplayName("currentPrice >> avg + 0.5σ → Expensive (zScore > +0.5)")
         void expensiveWhenWellAboveHalfSigma() {
-            // avg=200k, stdDev=20k → +0.5σ 경계 = 210k
+            // avg=200k, stdDev=20k → +0.5σ 경계 = 210k, 230k 는 확실히 그 위
             FareVerdict result = calculator.evaluate(230_000L, defaultStats());
 
             assertThat(result).isInstanceOf(FareVerdict.Expensive.class);
-            FareVerdict.Expensive expensive = (FareVerdict.Expensive) result;
-            assertThat(expensive.currentPrice()).isEqualTo(230_000L);
-            assertThat(expensive.avgPrice()).isEqualTo(200_000L);
-            assertThat(expensive.zScore()).isEqualTo(1.5);
+            if (result instanceof FareVerdict.Expensive expensive) {
+                assertThat(expensive.currentPrice()).isEqualTo(230_000L);
+                assertThat(expensive.avgPrice()).isEqualTo(200_000L);
+                assertThat(expensive.zScore()).isCloseTo(1.5, within(1e-9));
+            }
             assertThat(result.kind()).isEqualTo(FareVerdictKind.EXPENSIVE);
         }
     }
@@ -95,6 +99,11 @@ class FareVerdictCalculatorTest {
     @Nested
     @DisplayName("경계값 (strict 부등호)")
     class Boundary {
+
+        // 참고: 이 테스트들의 가격/stdDev 조합 (20_000, 20_001 등) 은 모두 IEEE 754
+        // double 에 정확히 표현되는 정수 값이므로 부동소수점 반올림이 결과에 영향을
+        // 주지 않는다. stdDev 를 2의 거듭제곱이 아닌 값 (예: 3_333) 으로 바꿀 때는
+        // 경계값을 다시 계산해야 한다.
 
         @Test
         @DisplayName("price = avg − 1σ 정확히 → Fair (Cheap 아님, strict <)")
@@ -170,16 +179,35 @@ class FareVerdictCalculatorTest {
         }
 
         @Test
-        @DisplayName("stdDev == 0 + price != avg → Fair (통계 신호 없음)")
-        void zeroStdDevWithDifferentPriceIsFair() {
+        @DisplayName("stdDev == 0 + price 50% 하락 → Fair (통계 신호 없음)")
+        void zeroStdDevWith50PercentCheaperIsFair() {
             FareStatistics s = stats(200_000L, 200_000L, 200_000L, 0.0, 40);
 
-            // price 가 50% 싸도, 분산이 0이라 통계적 신호 없음 → Fair
-            FareVerdict cheap = calculator.evaluate(100_000L, s);
-            FareVerdict expensive = calculator.evaluate(400_000L, s);
+            FareVerdict result = calculator.evaluate(100_000L, s);
 
-            assertThat(cheap).isInstanceOf(FareVerdict.Fair.class);
-            assertThat(expensive).isInstanceOf(FareVerdict.Fair.class);
+            assertThat(result).isInstanceOf(FareVerdict.Fair.class);
+        }
+
+        @Test
+        @DisplayName("stdDev == 0 + price 100% 상승 → Fair (통계 신호 없음)")
+        void zeroStdDevWith100PercentExpensiveIsFair() {
+            FareStatistics s = stats(200_000L, 200_000L, 200_000L, 0.0, 40);
+
+            FareVerdict result = calculator.evaluate(400_000L, s);
+
+            assertThat(result).isInstanceOf(FareVerdict.Fair.class);
+        }
+
+        @Test
+        @DisplayName("stdDev 가 0보다 크지만 MIN_MEANINGFUL_STD_DEV 미만 → Fair (노이즈 차단)")
+        void subEpsilonStdDevIsFair() {
+            // stdDev = 0.5 원. 실질적으로 변동 없음. epsilon 가드가 작동해야 함.
+            // 정확한 0.0 비교였으면 zScore 가 천문학적 수가 돼서 Cheap 오탐 발생.
+            FareStatistics s = stats(200_000L, 200_000L, 200_000L, 0.5, 40);
+
+            FareVerdict result = calculator.evaluate(100_000L, s);
+
+            assertThat(result).isInstanceOf(FareVerdict.Fair.class);
         }
 
         @Test
@@ -231,11 +259,24 @@ class FareVerdictCalculatorTest {
             FareVerdictCalculator strict = new FareVerdictCalculator(30, 2.0, 0.5);
 
             // avg=200k, stdDev=20k → -1σ=180k, -2σ=160k
-            FareVerdict at180 = strict.evaluate(170_000L, defaultStats()); // zScore=-1.5
-            FareVerdict at160 = strict.evaluate(159_000L, defaultStats()); // zScore≈-2.05
+            FareVerdict at170 = strict.evaluate(170_000L, defaultStats()); // zScore=-1.5
+            FareVerdict at159 = strict.evaluate(159_000L, defaultStats()); // zScore≈-2.05
 
-            assertThat(at180).isInstanceOf(FareVerdict.Fair.class);
-            assertThat(at160).isInstanceOf(FareVerdict.Cheap.class);
+            assertThat(at170).isInstanceOf(FareVerdict.Fair.class);
+            assertThat(at159).isInstanceOf(FareVerdict.Cheap.class);
+        }
+
+        @Test
+        @DisplayName("expensiveSigma=1.5 으로 더 엄격한 기준 → +1σ 가격은 Fair")
+        void stricterExpensiveThreshold() {
+            FareVerdictCalculator strict = new FareVerdictCalculator(30, 1.0, 1.5);
+
+            // avg=200k, stdDev=20k → +0.5σ=210k, +1σ=220k, +1.5σ=230k
+            FareVerdict at220 = strict.evaluate(220_000L, defaultStats()); // zScore=1.0
+            FareVerdict at231 = strict.evaluate(231_000L, defaultStats()); // zScore≈1.55
+
+            assertThat(at220).isInstanceOf(FareVerdict.Fair.class);
+            assertThat(at231).isInstanceOf(FareVerdict.Expensive.class);
         }
 
         @Test

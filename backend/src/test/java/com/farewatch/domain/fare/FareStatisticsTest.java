@@ -78,6 +78,33 @@ class FareStatisticsTest {
     }
 
     @Test
+    @DisplayName("NaN stdDeviation 거부 (통계 계산 버그 방어)")
+    void rejectsNaNStdDev() {
+        assertThatThrownBy(() -> FareStatistics.compute(
+                ROUTE_ID, DEP, 200_000L, 100_000L, 300_000L, Double.NaN, 10, null, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("finite");
+    }
+
+    @Test
+    @DisplayName("Infinity stdDeviation 거부")
+    void rejectsInfiniteStdDev() {
+        assertThatThrownBy(() -> FareStatistics.compute(
+                ROUTE_ID, DEP, 200_000L, 100_000L, 300_000L, Double.POSITIVE_INFINITY, 10, null, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("finite");
+    }
+
+    @Test
+    @DisplayName("0원 avgPrice 거부 (의미 없는 평균)")
+    void rejectsZeroAvg() {
+        assertThatThrownBy(() -> FareStatistics.compute(
+                ROUTE_ID, DEP, 0L, 0L, 0L, 0.0, 10, null, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("avgPrice");
+    }
+
+    @Test
     @DisplayName("recompute(): 기존 행의 값을 갱신하고 calculatedAt 을 새로 설정")
     void recomputeUpdatesFields() throws InterruptedException {
         FareStatistics stats = FareStatistics.compute(

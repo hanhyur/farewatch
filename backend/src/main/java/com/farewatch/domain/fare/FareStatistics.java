@@ -144,11 +144,22 @@ public class FareStatistics {
 
     private static void validateInvariants(
             long avg, long min, long max, double stdDev, int sampleCount) {
+        if (avg <= 0) {
+            // 0원 평균가는 의미 없음 (FareSnapshot 이 price > 0 을 강제하므로 이론상 불가능).
+            // 하지만 DB 에서 직접 주입되는 경로나 배치 버그로 들어올 수 있어 명시 방어.
+            throw new IllegalArgumentException("avgPrice must be > 0, was " + avg);
+        }
         if (min > avg) {
             throw new IllegalArgumentException("min (" + min + ") must be <= avg (" + avg + ")");
         }
         if (avg > max) {
             throw new IllegalArgumentException("avg (" + avg + ") must be <= max (" + max + ")");
+        }
+        if (!Double.isFinite(stdDev)) {
+            // NaN / Infinity 는 통계 계산 버그의 증거. 하류 Rule Engine 에서 zScore
+            // 계산을 망가뜨리므로 저장 시점에 차단.
+            throw new IllegalArgumentException(
+                    "stdDeviation must be finite, was " + stdDev);
         }
         if (stdDev < 0) {
             throw new IllegalArgumentException("stdDeviation must be >= 0, was " + stdDev);
