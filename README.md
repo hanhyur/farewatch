@@ -2,6 +2,7 @@
 
 > **"지금 이 항공권 가격에 사도 되는가?"** — 가격 히스토리에 기반해 구매 시점을 판단해주는 시스템.
 
+[![CI](https://github.com/hanhyur/farewatch/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/hanhyur/farewatch/actions/workflows/ci.yml)
 [![Java](https://img.shields.io/badge/Java-21-orange)](https://openjdk.org/projects/jdk/21/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.3.5-brightgreen)](https://spring.io/projects/spring-boot)
 [![License](https://img.shields.io/badge/License-MIT-blue)](#license)
