@@ -19,9 +19,11 @@ class MoneyTest {
     }
 
     @Test
-    @DisplayName("0원 허용 (amount >= 0)")
-    void acceptsZero() {
-        assertThat(new Money(0L, "KRW").amount()).isZero();
+    @DisplayName("0원 거부 (항공권/목표가/알림 전송가 어디든 0은 의미 없음)")
+    void rejectsZero() {
+        assertThatThrownBy(() -> new Money(0L, "KRW"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("amount");
     }
 
     @Test
@@ -37,6 +39,28 @@ class MoneyTest {
     void rejectsNullCurrency() {
         assertThatThrownBy(() -> new Money(1000L, null))
                 .isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    @DisplayName("빈 문자열 또는 공백 currency 거부")
+    void rejectsBlankCurrency() {
+        assertThatThrownBy(() -> new Money(1000L, ""))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("currency");
+        assertThatThrownBy(() -> new Money(1000L, "   "))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("currency");
+    }
+
+    @Test
+    @DisplayName("3글자가 아닌 currency 거부")
+    void rejectsCurrencyWrongLength() {
+        assertThatThrownBy(() -> new Money(1000L, "KR"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("currency");
+        assertThatThrownBy(() -> new Money(1000L, "KRWW"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("currency");
     }
 
     @Test

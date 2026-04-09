@@ -102,9 +102,7 @@ public class Notification {
         Objects.requireNonNull(verdict, "verdict must not be null");
         Objects.requireNonNull(priceAtSend, "priceAtSend must not be null");
         Objects.requireNonNull(channel, "channel must not be null");
-        if (priceAtSend.amount() <= 0) {
-            throw new IllegalArgumentException("price must be > 0, was " + priceAtSend.amount());
-        }
+        // priceAtSend.amount() > 0 은 Money 생성자가 이미 강제.
         return new Notification(
                 alertRuleId, routeId, departureDate, LocalDateTime.now(),
                 verdict, priceAtSend, channel, message);

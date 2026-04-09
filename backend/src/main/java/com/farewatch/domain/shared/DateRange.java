@@ -22,7 +22,7 @@ public record DateRange(LocalDate from, LocalDate to) {
     }
 
     public boolean contains(LocalDate date) {
-        Objects.requireNonNull(date);
+        Objects.requireNonNull(date, "date must not be null");
         return !date.isBefore(from) && !date.isAfter(to);
     }
 }

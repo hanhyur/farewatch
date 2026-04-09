@@ -22,6 +22,15 @@ public sealed interface FareVerdict
 
     /** "지금 사세요" — 평균보다 1σ 이상 저렴. */
     record Cheap(long currentPrice, long avgPrice, double zScore) implements FareVerdict {
+        public Cheap {
+            if (currentPrice <= 0 || avgPrice <= 0) {
+                throw new IllegalArgumentException("prices must be > 0");
+            }
+            if (!Double.isFinite(zScore)) {
+                throw new IllegalArgumentException("zScore must be finite, was " + zScore);
+            }
+        }
+
         @Override
         public FareVerdictKind kind() {
             return FareVerdictKind.CHEAP;
@@ -30,6 +39,12 @@ public sealed interface FareVerdict
 
     /** "적정가" — 평균 ±0.5σ 밴드 안. */
     record Fair(long currentPrice, long avgPrice) implements FareVerdict {
+        public Fair {
+            if (currentPrice <= 0 || avgPrice <= 0) {
+                throw new IllegalArgumentException("prices must be > 0");
+            }
+        }
+
         @Override
         public FareVerdictKind kind() {
             return FareVerdictKind.FAIR;
@@ -38,6 +53,15 @@ public sealed interface FareVerdict
 
     /** "더 기다리세요" — 평균보다 0.5σ 이상 비쌈. */
     record Expensive(long currentPrice, long avgPrice, double zScore) implements FareVerdict {
+        public Expensive {
+            if (currentPrice <= 0 || avgPrice <= 0) {
+                throw new IllegalArgumentException("prices must be > 0");
+            }
+            if (!Double.isFinite(zScore)) {
+                throw new IllegalArgumentException("zScore must be finite, was " + zScore);
+            }
+        }
+
         @Override
         public FareVerdictKind kind() {
             return FareVerdictKind.EXPENSIVE;
@@ -46,6 +70,15 @@ public sealed interface FareVerdict
 
     /** "데이터 부족" — 통계적으로 유의미한 표본 수 미달. */
     record Insufficient(int sampleCount, int requiredCount) implements FareVerdict {
+        public Insufficient {
+            if (sampleCount < 0) {
+                throw new IllegalArgumentException("sampleCount must be >= 0, was " + sampleCount);
+            }
+            if (requiredCount <= 0) {
+                throw new IllegalArgumentException("requiredCount must be > 0, was " + requiredCount);
+            }
+        }
+
         @Override
         public FareVerdictKind kind() {
             return FareVerdictKind.INSUFFICIENT;

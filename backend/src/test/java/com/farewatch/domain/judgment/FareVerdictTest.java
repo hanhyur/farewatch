@@ -1,6 +1,7 @@
 package com.farewatch.domain.judgment;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.farewatch.domain.shared.FareVerdictKind;
 import org.junit.jupiter.api.DisplayName;
@@ -45,6 +46,9 @@ class FareVerdictTest {
     @Test
     @DisplayName("Java 21 exhaustive switch로 모든 variant 처리")
     void exhaustiveSwitch() {
+        // 이 테스트의 실질적 가치는 "컴파일 타임 exhaustiveness 검증" 이다. sealed
+        // interface에 새 variant가 추가되면 아래 switch가 컴파일 에러를 내므로 누락
+        // 방지. 런타임 assertion은 sanity check 수준.
         FareVerdict[] verdicts = {
                 new FareVerdict.Cheap(100, 200, -2.0),
                 new FareVerdict.Fair(200, 200),
@@ -59,7 +63,27 @@ class FareVerdictTest {
                 case FareVerdict.Expensive e -> "expensive";
                 case FareVerdict.Insufficient i -> "insufficient";
             };
-            assertThat(label).isNotNull();
+            assertThat(label).isNotBlank();
         }
+    }
+
+    @Test
+    @DisplayName("Cheap: 음수 가격, NaN zScore 거부")
+    void cheapRejectsInvalid() {
+        assertThatThrownBy(() -> new FareVerdict.Cheap(-1, 200, -1.0))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new FareVerdict.Cheap(100, 200, Double.NaN))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new FareVerdict.Cheap(100, 200, Double.POSITIVE_INFINITY))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("Insufficient: 음수 sampleCount 또는 0 이하 requiredCount 거부")
+    void insufficientRejectsInvalid() {
+        assertThatThrownBy(() -> new FareVerdict.Insufficient(-1, 30))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new FareVerdict.Insufficient(10, 0))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 }

@@ -59,6 +59,14 @@ public class AlertRule {
     })
     private DateRange departureRange;
 
+    /**
+     * 목표 가격. nullable — 사용자가 목표가를 지정하지 않을 수 있음.
+     *
+     * <p><b>Hibernate null-collapse:</b> embeddable은 모든 필드가 null일 때만 전체가
+     * null로 저장된다. {@code Money} 생성자가 {@code amount > 0} 과 {@code currency}
+     * 3글자를 강제하므로, 유효한 Money 객체라면 두 필드 모두 non-null이다. 따라서
+     * "null Money" 와 "모든 필드 null인 Money" 의 애매한 상태는 발생하지 않는다.
+     */
     @Embedded
     @AttributeOverrides({
         @AttributeOverride(name = "amount", column = @Column(name = "target_price")),
@@ -66,7 +74,7 @@ public class AlertRule {
                 name = "currency",
                 column = @Column(name = "target_price_currency", length = 3))
     })
-    private Money targetPrice; // nullable
+    private Money targetPrice;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "verdict_trigger", length = 20, nullable = false)

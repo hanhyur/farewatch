@@ -39,12 +39,12 @@ class FareSnapshotTest {
     }
 
     @Test
-    @DisplayName("0원 가격 거부 (무료 항공권은 수집 대상 아님)")
-    void rejectsZeroPrice() {
-        assertThatThrownBy(() -> FareSnapshot.record(
-                ROUTE_ID, DEP, Money.krw(0L), "MOCK", Map.of()))
+    @DisplayName("0원 가격은 Money 생성 시점에 이미 거부됨 (Money 자체가 > 0 강제)")
+    void rejectsZeroPriceViaMoney() {
+        // Money(0) 이 IllegalArgumentException 을 던지므로 FareSnapshot.record 는 호출되지 않음.
+        assertThatThrownBy(() -> Money.krw(0L))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("price");
+                .hasMessageContaining("amount");
     }
 
     @Test

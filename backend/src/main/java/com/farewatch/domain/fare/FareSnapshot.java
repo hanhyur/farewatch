@@ -12,6 +12,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -77,13 +79,17 @@ public class FareSnapshot {
         this.collectedAt = collectedAt;
         this.price = price;
         this.source = source;
-        this.rawData = rawData;
+        // Defensive copy: 호출자가 전달한 맵을 나중에 변경해도 엔티티의 append-only
+        // 불변성이 깨지지 않도록 내부에 복사본 보관. Map.copyOf는 null value를 거부하므로
+        // HashMap으로 복사한 뒤 unmodifiable로 래핑한다.
+        this.rawData = rawData == null ? null : Collections.unmodifiableMap(new HashMap<>(rawData));
     }
 
     /**
-     * 새 가격 스냅샷 기록. 가격은 {@code > 0} 이어야 한다.
+     * 새 가격 스냅샷 기록. 가격은 {@link Money} 생성자에서 {@code > 0} 이 이미 강제됨.
      *
-     * @param rawData 수집기의 원본 응답 (nullable — 원본 미보관 케이스)
+     * @param rawData 수집기의 원본 응답 (nullable — 원본 미보관 케이스). 내부에
+     *     defensive copy 되어 저장되므로 호출자가 이후 원본 맵을 변경해도 안전.
      */
     public static FareSnapshot record(
             Long routeId,
@@ -95,9 +101,6 @@ public class FareSnapshot {
         Objects.requireNonNull(departureDate, "departureDate must not be null");
         Objects.requireNonNull(price, "price must not be null");
         Objects.requireNonNull(source, "source must not be null");
-        if (price.amount() <= 0) {
-            throw new IllegalArgumentException("price must be > 0, but was " + price.amount());
-        }
         return new FareSnapshot(routeId, departureDate, LocalDateTime.now(), price, source, rawData);
     }
 
@@ -125,6 +128,9 @@ public class FareSnapshot {
         return source;
     }
 
+    /**
+     * 원본 수집 데이터 조회. 반환 맵은 수정 불가 (생성자에서 unmodifiable로 저장됨).
+     */
     public Map<String, Object> getRawData() {
         return rawData;
     }

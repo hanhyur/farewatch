@@ -67,12 +67,10 @@ class NotificationTest {
     }
 
     @Test
-    @DisplayName("0원 priceAtSend 거부 (무의미한 알림)")
-    void rejectsZeroPrice() {
-        assertThatThrownBy(() -> Notification.send(
-                RULE_ID, ROUTE_ID, DEP, FareVerdictKind.CHEAP,
-                Money.krw(0L), NotificationChannel.LOG, "x"))
+    @DisplayName("0원 priceAtSend 는 Money 생성 시점에 이미 거부됨")
+    void rejectsZeroPriceViaMoney() {
+        assertThatThrownBy(() -> Money.krw(0L))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("price");
+                .hasMessageContaining("amount");
     }
 }

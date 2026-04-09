@@ -11,6 +11,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 @DataJpaTest
 @DisplayName("FareSnapshotRepository (@DataJpaTest)")
@@ -68,7 +70,8 @@ class FareSnapshotRepositoryTest {
                 FareSnapshot.record(ROUTE_1, MAY_15, Money.krw(180_000L), "MOCK", Map.of()));
 
         List<FareSnapshot> results =
-                repository.findByRouteIdAndDepartureDateOrderByCollectedAtDesc(ROUTE_1, MAY_15);
+                repository.findByRouteIdAndDepartureDateOrderByCollectedAtDesc(
+                        ROUTE_1, MAY_15, PageRequest.of(0, 10));
 
         assertThat(results).extracting(FareSnapshot::getId)
                 .containsExactly(second.getId(), first.getId());
@@ -82,7 +85,8 @@ class FareSnapshotRepositoryTest {
         repository.save(FareSnapshot.record(ROUTE_1, MAY_20, Money.krw(210_000L), "MOCK", Map.of()));
 
         List<FareSnapshot> results =
-                repository.findByRouteIdAndDepartureDateBetween(ROUTE_1, MAY_15, MAY_16);
+                repository.findByRouteIdAndDepartureDateBetween(
+                        ROUTE_1, MAY_15, MAY_16, PageRequest.of(0, 50));
 
         assertThat(results).hasSize(2);
     }

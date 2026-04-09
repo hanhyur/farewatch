@@ -10,10 +10,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 
 @DataJpaTest
-@EnableJpaRepositories(basePackageClasses = FareStatisticsRepository.class)
 @DisplayName("FareStatisticsRepository (@DataJpaTest)")
 class FareStatisticsRepositoryTest {
 
