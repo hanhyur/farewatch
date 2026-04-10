@@ -10,6 +10,10 @@ import com.farewatch.domain.fare.FareStatisticsRepository;
 import com.farewatch.domain.judgment.FareVerdict;
 import com.farewatch.domain.route.RouteRepository;
 import com.farewatch.domain.shared.FareVerdictKind;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.Optional;
@@ -33,6 +37,10 @@ import org.springframework.web.bind.annotation.RestController;
  *   <li>통계가 아직 없으면 Insufficient + sample=0 응답
  * </ul>
  */
+@Tag(
+        name = "Judgment",
+        description =
+                "**핵심 엔드포인트**: 현재 가격이 통계 대비 어떤 구매 판단(CHEAP/FAIR/EXPENSIVE/INSUFFICIENT)에 해당하는지 반환")
 @RestController
 @RequestMapping("/api/v1/routes/{id}/judgment")
 public class JudgmentController {
@@ -58,10 +66,32 @@ public class JudgmentController {
         this.clock = clock;
     }
 
+    @Operation(
+            summary = "구매 판단",
+            description =
+                    """
+                    노선의 현재 가격에 대한 판단 결과 (CHEAP/FAIR/EXPENSIVE/INSUFFICIENT) 와
+                    추천 메시지를 반환한다.
+
+                    - 표본이 30개 미만 → INSUFFICIENT
+                    - 현재가 < 평균 - 1σ → CHEAP (구매 추천)
+                    - 현재가 > 평균 + 0.5σ → EXPENSIVE (대기 추천)
+                    - 그 외 → FAIR
+
+                    `departureDate` 미지정 시 today + 7일 사용.
+                    """)
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "404",
+                description = "노선 또는 가격 스냅샷이 없음")
+    })
     @GetMapping
     public ApiResponse<JudgmentResponse> judgment(
-            @PathVariable Long id,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            @Parameter(description = "노선 ID") @PathVariable Long id,
+            @Parameter(description = "출발일 (YYYY-MM-DD). 생략 시 오늘 + 7일")
+                    @RequestParam(required = false)
+                    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
                     LocalDate departureDate) {
         if (!routeRepository.existsById(id)) {
             throw new ResourceNotFoundException("route not found: " + id);
