@@ -8,6 +8,9 @@ spring:
     username: sa
     password:
 
+  flyway:
+    enabled: false  # H2 프로파일에서는 ddl-auto 사용, Flyway는 docker 프로파일에서 활성화
+
   jpa:
     hibernate:
       ddl-auto: update
@@ -30,7 +33,8 @@ springdoc:
 
 farewatch:
   collection:
-    # 수집 주기. 기본 6시간 (21_600_000 ms). 테스트/로컬에서 오버라이드 가능.
-    interval-ms: 21600000
-    # 출발일 오프셋 (today + N일). 스케줄러 sweep 마다 이 날짜들에 대해 스냅샷 수집.
-    target-day-offsets: 7,14,30
+    # 수집 주기. 기본 12시간 (43_200_000 ms). SerpApi 무료 250호출/월 기준.
+    # 12h × 2노선 × 2출발일 = 8회/일 ≈ 240회/월.
+    interval-ms: 43200000
+    # 출발일 오프셋 (today + N일). 무료 쿼터를 위해 2개로 제한.
+    target-day-offsets: 7,14

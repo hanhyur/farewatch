@@ -1,7 +1,12 @@
 package com.farewatch.api.route;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -17,6 +22,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(controllers = RouteController.class)
@@ -59,6 +65,85 @@ class RouteControllerTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error").value("route not found: 99"));
+    }
+
+    @Test
+    void create_returns201WithBody() throws Exception {
+        when(routeRepository.findByOriginAndDestination(any(), any())).thenReturn(Optional.empty());
+        when(routeRepository.save(any(Route.class)))
+                .thenAnswer(
+                        inv -> {
+                            Route arg = inv.getArgument(0);
+                            setId(arg, 10L);
+                            return arg;
+                        });
+
+        mockMvc.perform(
+                        post("/api/v1/routes")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                        {"origin":"PUS","destination":"NRT","airlineCode":"KE"}
+                                        """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.id").value(10))
+                .andExpect(jsonPath("$.data.origin").value("PUS"))
+                .andExpect(jsonPath("$.data.destination").value("NRT"));
+    }
+
+    @Test
+    void create_duplicateRoute_returns400() throws Exception {
+        when(routeRepository.findByOriginAndDestination(any(), any()))
+                .thenReturn(Optional.of(persistedRoute(1L, "PUS", "NRT")));
+
+        mockMvc.perform(
+                        post("/api/v1/routes")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("""
+                                        {"origin":"PUS","destination":"NRT"}
+                                        """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.containsString("already exists")));
+    }
+
+    @Test
+    void create_invalidOrigin_returns400() throws Exception {
+        mockMvc.perform(
+                        post("/api/v1/routes")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("""
+                                        {"origin":"","destination":"NRT"}
+                                        """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void deactivate_returns204() throws Exception {
+        Route route = persistedRoute(1L, "PUS", "NRT");
+        when(routeRepository.findById(1L)).thenReturn(Optional.of(route));
+
+        mockMvc.perform(delete("/api/v1/routes/1")).andExpect(status().isNoContent());
+
+        verify(routeRepository).save(route);
+        assertThat(route.isActive()).isFalse();
+    }
+
+    @Test
+    void deactivate_unknownRoute_returns404() throws Exception {
+        when(routeRepository.findById(99L)).thenReturn(Optional.empty());
+
+        mockMvc.perform(delete("/api/v1/routes/99")).andExpect(status().isNotFound());
+    }
+
+    private static void setId(Route route, Long id) {
+        try {
+            Field f = Route.class.getDeclaredField("id");
+            f.setAccessible(true);
+            f.set(route, id);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     private static Route persistedRoute(long id, String origin, String destination) {
