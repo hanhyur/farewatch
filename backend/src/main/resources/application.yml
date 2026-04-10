@@ -8,6 +8,9 @@ spring:
     username: sa
     password:
 
+  flyway:
+    enabled: false  # H2 프로파일에서는 ddl-auto 사용, Flyway는 docker 프로파일에서 활성화
+
   jpa:
     hibernate:
       ddl-auto: update
