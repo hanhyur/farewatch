@@ -48,3 +48,7 @@ CLAUDE.md
 
 ### Local development docs (never committed) ###
 docs/
+
+### Local secrets (API keys, credentials) ###
+application-local.yml
+**/application-local.yml
