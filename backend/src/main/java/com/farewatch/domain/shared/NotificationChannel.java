@@ -7,5 +7,6 @@ package com.farewatch.domain.shared;
  * {@code NotificationSender} 인터페이스의 구현체가 담당한다.
  */
 public enum NotificationChannel {
-    LOG
+    LOG,
+    EMAIL
 }
