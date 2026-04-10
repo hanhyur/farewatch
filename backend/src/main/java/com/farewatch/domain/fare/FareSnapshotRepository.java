@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface FareSnapshotRepository extends JpaRepository<FareSnapshot, Long> {
 
@@ -32,4 +34,17 @@ public interface FareSnapshotRepository extends JpaRepository<FareSnapshot, Long
 
     /** 통계 계산 전 충분한 표본이 있는지 확인. 집계 count 이므로 pagination 불필요. */
     long countByRouteIdAndDepartureDate(Long routeId, LocalDate departureDate);
+
+    /**
+     * 통계 재계산 용 가격 컬럼 추출 쿼리. 엔티티 전체가 아니라 {@code price.amount}
+     * 컬럼만 가져와 메모리·네트워크 부담을 최소화한다.
+     *
+     * <p>한 (route, departureDate) 쌍의 누적 스냅샷 수는 수집 빈도(6h) × 모니터링
+     * 기간 으로 상한이 분명하므로 (현실적 최대 수천 건) 페이징 없이 전체 조회한다.
+     */
+    @Query(
+            "SELECT s.price.amount FROM FareSnapshot s "
+                    + "WHERE s.routeId = :routeId AND s.departureDate = :departureDate")
+    List<Long> findPricesByRouteIdAndDepartureDate(
+            @Param("routeId") Long routeId, @Param("departureDate") LocalDate departureDate);
 }
