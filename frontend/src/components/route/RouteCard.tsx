@@ -17,6 +17,7 @@ export function RouteCard({ route }: RouteCardProps) {
   const { data: judgment, isLoading, isError } = useQuery({
     queryKey: ["judgment", route.id],
     queryFn: () => fetchJudgment(route.id),
+    refetchInterval: 5 * 60 * 1000,
   });
 
   return (

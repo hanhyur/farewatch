@@ -34,6 +34,7 @@ export default function RouteDetailPage({ params }: RouteDetailPageProps) {
     queryKey: ["judgment", routeId],
     queryFn: () => fetchJudgment(routeId),
     enabled: Number.isFinite(routeId),
+    refetchInterval: 5 * 60 * 1000,
   });
   const fares = useQuery({
     queryKey: ["fares", routeId],
