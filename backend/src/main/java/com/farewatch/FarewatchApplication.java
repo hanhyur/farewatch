@@ -1,5 +1,6 @@
 package com.farewatch;
 
+import com.farewatch.application.judgment.FareVerdictCalculator;
 import java.time.Clock;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -21,5 +22,14 @@ public class FarewatchApplication {
     @Bean
     public Clock systemClock() {
         return Clock.systemDefaultZone();
+    }
+
+    /**
+     * Rule Engine 빈. 기본 임계값 (sample 30, cheap 1.0σ, expensive 0.5σ) 으로 등록한다.
+     * 향후 {@code @ConfigurationProperties} 로 외부화 가능.
+     */
+    @Bean
+    public FareVerdictCalculator fareVerdictCalculator() {
+        return new FareVerdictCalculator();
     }
 }
