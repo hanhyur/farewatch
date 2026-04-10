@@ -1,0 +1,19 @@
+# 로컬 개발 프로파일. 다음 명령으로 활성화:
+#   ./gradlew :backend:bootRun --args='--spring.profiles.active=dev'
+#
+# 효과:
+#   - DevDataInitializer 가 활성화되어 노선 2개 + 출발일 5개 × 40 스냅샷 시드
+#   - 스케줄러 주기를 1분으로 단축 (운영 6h → 개발 1m)
+#   - SQL 로그 최소화 (시드 시 노이즈 줄이기)
+
+spring:
+  jpa:
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+
+farewatch:
+  collection:
+    interval-ms: 60000  # 1분 — 운영 21_600_000ms 의 360분의 1
+    target-day-offsets: 7,14,21,28,35
