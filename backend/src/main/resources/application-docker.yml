@@ -1,0 +1,32 @@
+# Docker Compose 의 PostgreSQL 에 연결하는 프로파일.
+# 사용법:
+#   docker compose up -d
+#   ./gradlew :backend:bootRun --args='--spring.profiles.active=docker'
+#
+# dev 시드도 함께 사용하려면:
+#   ./gradlew :backend:bootRun --args='--spring.profiles.active=docker,dev'
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/farewatch
+    driver-class-name: org.postgresql.Driver
+    username: farewatch
+    password: farewatch
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+  jpa:
+    hibernate:
+      ddl-auto: validate  # Flyway 가 스키마를 관리, Hibernate 는 검증만
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: false
+    show-sql: false
+
+  h2:
+    console:
+      enabled: false
