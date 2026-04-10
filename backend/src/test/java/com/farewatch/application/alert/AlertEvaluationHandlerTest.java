@@ -63,7 +63,7 @@ class AlertEvaluationHandlerTest {
                         statisticsRepository,
                         notificationRepository,
                         new FareVerdictCalculator(),
-                        sender,
+                        List.of(sender),
                         fixedClock);
     }
 

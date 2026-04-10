@@ -1,0 +1,21 @@
+# 로컬 시크릿 예시. 이 파일을 application-local.yml 로 복사한 뒤 실제 값을 채워 사용.
+# application-local.yml 은 .gitignore 에 등록되어 커밋되지 않음.
+
+farewatch:
+  collector:
+    serpapi:
+      api-key: YOUR_SERPAPI_KEY_HERE
+
+# Gmail SMTP 예시 (앱 비밀번호 필요: https://myaccount.google.com/apppasswords)
+spring:
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: your-email@gmail.com
+    password: your-app-password
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true

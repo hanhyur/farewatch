@@ -63,7 +63,7 @@ public class AlertEvaluationHandler {
     private final FareStatisticsRepository statisticsRepository;
     private final NotificationRepository notificationRepository;
     private final FareVerdictCalculator verdictCalculator;
-    private final NotificationSender sender;
+    private final List<NotificationSender> senders;
     private final Clock clock;
 
     public AlertEvaluationHandler(
@@ -71,13 +71,13 @@ public class AlertEvaluationHandler {
             FareStatisticsRepository statisticsRepository,
             NotificationRepository notificationRepository,
             FareVerdictCalculator verdictCalculator,
-            NotificationSender sender,
+            List<NotificationSender> senders,
             Clock clock) {
         this.alertRuleRepository = Objects.requireNonNull(alertRuleRepository);
         this.statisticsRepository = Objects.requireNonNull(statisticsRepository);
         this.notificationRepository = Objects.requireNonNull(notificationRepository);
         this.verdictCalculator = Objects.requireNonNull(verdictCalculator);
-        this.sender = Objects.requireNonNull(sender);
+        this.senders = Objects.requireNonNull(senders);
         this.clock = Objects.requireNonNull(clock);
     }
 
@@ -126,17 +126,20 @@ public class AlertEvaluationHandler {
             }
 
             FareVerdictKind kind = verdict.kind();
-            Notification notification =
-                    Notification.send(
-                            rule.getId(),
-                            routeId,
-                            departureDate,
-                            kind,
-                            snapshot.getPrice(),
-                            sender.channel(),
-                            buildMessage(verdict));
-            notificationRepository.save(notification);
-            sender.send(rule, verdict, snapshot);
+            String message = buildMessage(verdict);
+            for (NotificationSender sender : senders) {
+                Notification notification =
+                        Notification.send(
+                                rule.getId(),
+                                routeId,
+                                departureDate,
+                                kind,
+                                snapshot.getPrice(),
+                                sender.channel(),
+                                message);
+                notificationRepository.save(notification);
+                sender.send(rule, verdict, snapshot);
+            }
         }
     }
 
