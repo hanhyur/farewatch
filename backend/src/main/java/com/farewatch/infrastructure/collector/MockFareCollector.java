@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Random;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.stereotype.Component;
 
 /**
@@ -28,6 +29,7 @@ import org.springframework.stereotype.Component;
  * {@link Random} 인스턴스를 생성한다.
  */
 @Component
+@ConditionalOnMissingBean(SerpApiFareCollector.class)
 public class MockFareCollector implements FareCollector {
 
     /** 수집기 식별자. {@code FareSnapshot.source} 컬럼에 기록된다. */
