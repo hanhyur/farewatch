@@ -4,6 +4,7 @@ import com.farewatch.application.collector.FareCollector;
 import com.farewatch.domain.fare.FareSnapshot;
 import com.farewatch.domain.route.Route;
 import com.farewatch.domain.shared.Money;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -65,26 +66,24 @@ public class MockFareCollector implements FareCollector {
     }
 
     private static long generatePrice(long routeId, LocalDate departureDate) {
-        long seed = 31L * routeId + departureDate.toEpochDay();
-        Random random = new Random(seed);
+        // 기본 시드: 노선 + 출발일 → 기준 가격 결정
+        long baseSeed = 31L * routeId + departureDate.toEpochDay();
+        Random baseRng = new Random(baseSeed);
 
-        // base draw in [MIN_PRICE, MAX_PRICE]
         long range = MAX_PRICE - MIN_PRICE;
-        // drop the surcharge budget from the base draw so the total still fits in the band
-        long basePrice = MIN_PRICE + (long) (random.nextDouble() * (range - WEEKEND_SURCHARGE));
+        long basePrice = MIN_PRICE + (long) (baseRng.nextDouble() * (range - WEEKEND_SURCHARGE));
+
+        // 수집 시점마다 ±15% 변동 추가 (시간 기반 시드)
+        long timeBucket = Instant.now().getEpochSecond() / 60; // 분 단위 변동
+        Random fluctRng = new Random(baseSeed * 97L + timeBucket);
+        double fluctuation = 0.85 + fluctRng.nextDouble() * 0.30; // 0.85 ~ 1.15
+        long fluctuatedPrice = (long) (basePrice * fluctuation);
 
         // weekend bump: Sat(6) / Sun(7) get a fixed surcharge
         int dow = departureDate.getDayOfWeek().getValue();
         long surcharge = (dow == 6 || dow == 7) ? WEEKEND_SURCHARGE : 0L;
 
-        long price = basePrice + surcharge;
-        // invariant guard — base formula is bounded, but keep a defensive clamp
-        if (price < MIN_PRICE) {
-            return MIN_PRICE;
-        }
-        if (price > MAX_PRICE) {
-            return MAX_PRICE;
-        }
-        return price;
+        long price = fluctuatedPrice + surcharge;
+        return Math.max(MIN_PRICE, Math.min(MAX_PRICE, price));
     }
 }

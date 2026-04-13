@@ -22,41 +22,40 @@ export function RouteCard({ route }: RouteCardProps) {
 
   return (
     <Link href={`/routes/${route.id}`} className="block">
-      <Card interactive className="h-full p-6 flex flex-col gap-4">
-        <header className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-xs font-medium text-[var(--color-text-tertiary)]">
-              {route.airlineCode ?? "전체 항공사"}
-            </p>
-            <h3 className="text-xl font-semibold tracking-tight">
+      <Card interactive className="p-5">
+        {/* Top: Route name + badge */}
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--color-surface-muted)] text-[10px] font-bold text-[var(--color-text-tertiary)]">
+              {route.airlineCode ?? "ALL"}
+            </span>
+            <h3 className="text-lg font-semibold tracking-tight">
               {formatRouteName(route.origin, route.destination)}
             </h3>
           </div>
           {isLoading ? (
-            <Skeleton className="h-7 w-24" />
+            <Skeleton className="h-6 w-20" />
           ) : judgment ? (
             <VerdictBadge verdict={judgment.verdict} size="sm" />
           ) : null}
-        </header>
+        </div>
 
-        {isLoading ? (
-          <div className="flex flex-col gap-2">
-            <Skeleton className="h-8 w-32" />
-            <Skeleton className="h-4 w-48" />
-          </div>
-        ) : isError || !judgment ? (
-          <p className="text-sm text-[var(--color-text-tertiary)]">
-            판단 데이터를 불러올 수 없어요
-          </p>
-        ) : (
-          <>
-            <div>
-              <p className="text-3xl font-bold tracking-tight tabular-nums">
+        {/* Bottom: Price + detail */}
+        <div className="mt-3">
+          {isLoading ? (
+            <Skeleton className="h-7 w-32" />
+          ) : isError || !judgment ? (
+            <p className="text-sm text-[var(--color-text-tertiary)]">
+              데이터를 불러올 수 없어요
+            </p>
+          ) : (
+            <div className="flex items-baseline justify-between gap-4">
+              <p className="text-2xl font-bold tracking-tight tabular-nums">
                 {formatKrw(judgment.currentPrice)}
               </p>
               {judgment.avgPrice !== null && judgment.currentPrice !== null ? (
-                <p className="text-sm text-[var(--color-text-secondary)] tabular-nums">
-                  평균 대비{" "}
+                <p className="text-xs text-[var(--color-text-secondary)] tabular-nums">
+                  평균{" "}
                   <span
                     className={
                       judgment.currentPrice < judgment.avgPrice
@@ -68,19 +67,24 @@ export function RouteCard({ route }: RouteCardProps) {
                       percentDiff(judgment.currentPrice, judgment.avgPrice),
                       1,
                     )}
-                  </span>{" "}
-                  · 평균 {formatKrw(judgment.avgPrice)}
+                  </span>
+                  {" · "}
+                  {formatKrw(judgment.avgPrice)}
                 </p>
               ) : (
-                <p className="text-sm text-[var(--color-text-tertiary)]">
+                <p className="text-xs text-[var(--color-text-tertiary)]">
                   표본 {judgment.sampleCount}건
                 </p>
               )}
             </div>
-            <p className="text-sm text-[var(--color-text-secondary)] line-clamp-2">
-              {judgment.suggestion}
-            </p>
-          </>
+          )}
+        </div>
+
+        {/* Suggestion — single line */}
+        {judgment?.suggestion && (
+          <p className="mt-2 truncate text-xs text-[var(--color-text-secondary)]">
+            {judgment.suggestion}
+          </p>
         )}
       </Card>
     </Link>

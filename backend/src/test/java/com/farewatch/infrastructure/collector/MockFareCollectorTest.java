@@ -53,13 +53,14 @@ class MockFareCollectorTest {
     }
 
     @Test
-    @DisplayName("fetchFares is deterministic for the same (routeId, departureDate)")
-    void fetchFares_deterministicForSameKey() {
+    @DisplayName("fetchFares is deterministic within the same minute")
+    void fetchFares_deterministicWithinSameMinute() {
         LocalDate departure = LocalDate.of(2026, 5, 10);
 
         long firstPrice = collector.fetchFares(pusToNrt, departure).get(0).getPrice().amount();
         long secondPrice = collector.fetchFares(pusToNrt, departure).get(0).getPrice().amount();
 
+        // 같은 분 내에서 호출하면 동일 가격
         assertThat(firstPrice).isEqualTo(secondPrice);
     }
 

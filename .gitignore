@@ -50,5 +50,6 @@ CLAUDE.md
 docs/
 
 ### Local secrets (API keys, credentials) ###
+.env
 application-local.yml
 **/application-local.yml

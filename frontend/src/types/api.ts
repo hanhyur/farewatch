@@ -76,6 +76,46 @@ export interface CreateAlertRuleInput {
   verdictTrigger: VerdictTrigger;
 }
 
+export interface FlightOffer {
+  airline: string;
+  airlineCode: string;
+  price: number;
+  currency: string;
+  departureTime: string;
+  arrivalTime: string;
+  duration: string;
+  stops: number;
+  isBest: boolean;
+}
+
+export interface PriceInsights {
+  lowestPrice: number | null;
+  priceLevel: string | null;
+  typicalPriceLow: number | null;
+  typicalPriceHigh: number | null;
+}
+
+export interface AirportInfo {
+  iata: string;
+  name: string;
+  nameEn: string;
+  city: string;
+  cityEn: string;
+  country: string;
+}
+
+export type TripType = "ONE_WAY" | "ROUND_TRIP";
+
+export interface FlightSearchResult {
+  origin: string;
+  destination: string;
+  departureDate: string;
+  returnDate: string | null;
+  tripType: string;
+  flights: FlightOffer[];
+  priceInsights: PriceInsights | null;
+}
+
 export interface Notification {
   id: number;
   alertRuleId: number;
