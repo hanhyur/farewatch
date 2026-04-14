@@ -2,9 +2,10 @@
 
 > **"지금 이 항공권 가격에 사도 되는가?"** — 가격 히스토리에 기반해 구매 시점을 판단해주는 시스템.
 
-[![CI](https://github.com/hanhyur/farewatch/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/hanhyur/farewatch/actions/workflows/ci.yml)
+[![CI](https://github.com/hanhyur/farewatch/actions/workflows/ci.yml/badge.svg)](https://github.com/hanhyur/farewatch/actions/workflows/ci.yml)
 [![Java](https://img.shields.io/badge/Java-21-orange)](https://openjdk.org/projects/jdk/21/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.3.5-brightgreen)](https://spring.io/projects/spring-boot)
+[![Next.js](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org/)
 [![License](https://img.shields.io/badge/License-MIT-blue)](#license)
 
 ---
@@ -13,231 +14,263 @@
 
 항공권은 가격 변동 폭이 크고, 같은 노선이라도 예매 시점에 따라 수십만 원 차이가 납니다. 일반 메타서치(스카이스캐너 등)는 **현재 최저가**만 보여주지 `지금 이 가격이 역사적으로 싼지`는 알려주지 않습니다.
 
-**FareWatch는 노선별 가격 스냅샷을 주기적으로 수집·통계화해서 "지금 사도 되는가"를 정량적으로 판단합니다.**
+**FareWatch는 노선별 가격 스냅샷을 주기적으로 수집하고, 통계 기반으로 "지금 사도 되는가"를 정량적으로 판단합니다.**
 
 | 판단 | 기준 | 액션 |
 |------|------|------|
-| 🟢 **Cheap** ("지금 사세요") | `price < avg − 1.0σ` | 즉시 구매 추천 |
-| 🟡 **Fair** ("적정가") | 평균 ±0.5σ 밴드 | 손해는 아님 |
-| 🔴 **Expensive** ("더 기다리세요") | `price > avg + 0.5σ` | 구매 보류 |
-| ⚪ **Insufficient** ("데이터 부족") | `sample < 30` | 통계 유의성 미달 |
+| **Cheap** ("지금 사세요") | `price < avg - 1.0 * stdDev` | 즉시 구매 추천 |
+| **Fair** ("적정가") | 평균 +-0.5 stdDev 밴드 | 손해는 아님 |
+| **Expensive** ("더 기다리세요") | `price > avg + 0.5 * stdDev` | 구매 보류 |
+| **Insufficient** ("데이터 부족") | `sample < 30` | 통계 유의성 미달 |
 
-## 아키텍처 한눈에
+## 주요 기능
+
+- **가격 수집**: 12시간 주기 자동 수집 (스케줄러)
+- **특가 판단**: z-score 기반 Rule Engine (Sealed Interface)
+- **실시간 검색**: 왕복/편도, 직항/경유 필터, 공항 자동완성 (80+ 공항)
+- **알림**: 조건 충족 시 이메일 알림 (중복 7일 쿨다운)
+- **대시보드**: 노선 카드 + 판단 배지 + 가격 차트 + 필터
+
+## 아키텍처
 
 ```
-┌─────────────┐   @Scheduled(6h)     ┌───────────────┐
-│  Scheduler  │ ───────────────────▶ │ FareCollector │  (인터페이스)
-└─────────────┘                      └───────┬───────┘
-                                             │ fetchFares()
-                                             ▼
-                                    ┌────────────────┐
-                                    │ FareSnapshot   │  저장
-                                    │  Repository    │
-                                    └────────┬───────┘
-                                             │ publish
-                                             ▼
-                           ┌───────────────────────────────┐
-                           │  FareCollectedEvent (Spring)  │
-                           └────┬────────────────────┬─────┘
-                                │                    │
-                 StatisticsUpdateHandler    AlertEvaluationHandler
-                                │                    │
-                                ▼                    ▼
-                      fare_statistics 재계산    판단 → NotificationSender
+┌─────────────┐   @Scheduled(12h)    ┌───────────────┐
+│  Scheduler  │ ──────────────────▶ │ FareCollector │  (인터페이스)
+└─────────────┘                     └───────┬───────┘
+                                            │ fetchFares()
+                                            ▼
+                                   ┌────────────────┐
+                                   │ FareSnapshot   │  저장
+                                   │  Repository    │
+                                   └────────┬───────┘
+                                            │ publish
+                                            ▼
+                          ┌───────────────────────────────┐
+                          │  FareCollectedEvent (Spring)  │
+                          └────┬────────────────────┬─────┘
+                               │                    │
+                StatisticsUpdateHandler    AlertEvaluationHandler
+                               │                    │
+                               ▼                    ▼
+                     fare_statistics 재계산    판단 → NotificationSender
 ```
 
-수집 → 저장 → 이벤트 → 통계/알림 단방향 파이프라인. 수집기와 발송기는 인터페이스로 추상화되어, 실제 API / 이메일 연동은 구현체 교체로 가능합니다.
+수집 → 저장 → 이벤트 → 통계/알림 단방향 파이프라인.
+
+### 수집기 구조 (Strategy Pattern)
+
+수집기(`FareCollector`)와 알림 발송기(`NotificationSender`)는 **인터페이스로 추상화**되어 있어, 구현체 교체만으로 실제 API 연동이 가능합니다.
+
+```
+FareCollector (인터페이스)
+├── MockFareCollector        ← 저장소에 포함 (기본값, 외부 의존 없음)
+└── SerpApiFareCollector     ← 실환경 (SerpApi Google Flights 연동)
+
+NotificationSender (인터페이스)
+├── LogNotificationSender    ← 저장소에 포함 (콘솔 로그 출력)
+└── EmailNotificationSender  ← 실환경 (SMTP 이메일 발송)
+```
+
+> **보안 참고**: 실제 운영 환경에서는 SerpApi를 통해 Google Flights 데이터를 수집하지만, API 키 보안을 위해 저장소에는 Mock 구현체만 포함되어 있습니다. `application-local.yml`에 API 키를 설정하면 `@ConditionalOnProperty`에 의해 자동으로 실제 수집기로 전환됩니다.
 
 ## 기술 스택
 
 ### 백엔드
-- **Language**: Java 21 (record, sealed interface, pattern matching)
-- **Framework**: Spring Boot 3.3.5
-- **Persistence**: Spring Data JPA + Hibernate 6.5
-- **Database**: H2 (dev, in-memory) / PostgreSQL (prod)
-- **API Docs**: springdoc-openapi 2.6 (Swagger UI)
-- **Build**: Gradle (Groovy DSL)
-- **Test**: JUnit 5 + Mockito + AssertJ
+| 항목 | 기술 |
+|------|------|
+| Language | Java 21 (record, sealed interface, pattern matching) |
+| Framework | Spring Boot 3.3.5 |
+| Persistence | Spring Data JPA + Hibernate 6.5 |
+| Database | H2 (dev) / PostgreSQL 16 (prod, Docker) |
+| Migration | Flyway |
+| API Docs | springdoc-openapi 2.6 (Swagger UI) |
+| Build | Gradle (Groovy DSL) |
+| Test | JUnit 5 + Mockito + AssertJ (80+ tests) |
 
-### 프론트엔드 *(Phase 2 — 예정)*
-- Next.js 기반 대시보드
-- 노선 상세 + 가격 추이 차트 + 알림 규칙 등록 + 이력
+### 프론트엔드
+| 항목 | 기술 |
+|------|------|
+| Framework | Next.js 16 + React 19 |
+| Styling | Tailwind CSS 4 |
+| Data Fetching | TanStack Query |
+| Chart | Recharts |
+| Form | React Hook Form + Zod |
+
+### 인프라
+| 항목 | 기술 |
+|------|------|
+| 컨테이너 | Docker Compose (PostgreSQL + Backend + Frontend) |
+| CI | GitHub Actions |
 
 ## 모노레포 구조
 
-루트는 **Gradle 멀티 프로젝트** 이며 `backend` 를 서브프로젝트로 포함합니다. `gradlew` 래퍼와 `settings.gradle` 은 루트에 있고, 루트에서 모든 Gradle 태스크를 실행할 수 있습니다.
-
 ```
 farewatch/
-├── gradlew, gradlew.bat        Gradle wrapper (루트)
-├── gradle/wrapper/             wrapper jar + properties
-├── settings.gradle             rootProject.name + include 'backend'
-├── backend/                    Spring Boot 서브프로젝트
+├── gradlew, settings.gradle       Gradle wrapper (루트)
+├── docker-compose.yml             풀스택 Docker Compose
+├── .env.example                   환경변수 템플릿
+├── backend/
+│   ├── Dockerfile
 │   ├── build.gradle
-│   └── src/
-│       ├── main/java/com/farewatch/
-│       │   ├── FarewatchApplication.java
-│       │   └── domain/
-│       │       ├── shared/      공용 VO (AirportCode, Money, DateRange, EmailAddress) + enum
-│       │       ├── judgment/    FareVerdict (sealed interface)
-│       │       ├── route/       Route + Repository
-│       │       ├── fare/        FareSnapshot, FareStatistics + Repositories
-│       │       └── alert/       AlertRule, Notification + Repositories
-│       └── main/resources/
-│           └── application.yml
-├── frontend/                   Next.js 앱 (Phase 2)
-└── README.md
+│   └── src/main/java/com/farewatch/
+│       ├── domain/                엔티티, VO, Repository
+│       │   ├── route/             Route
+│       │   ├── fare/              FareSnapshot, FareStatistics
+│       │   ├── alert/             AlertRule, Notification
+│       │   ├── judgment/          FareVerdict (sealed interface)
+│       │   └── shared/            AirportCode, Money, DateRange 등
+│       ├── application/           비즈니스 로직
+│       │   ├── collector/         FareCollector 인터페이스 + 수집 서비스
+│       │   ├── search/            실시간 검색 서비스
+│       │   ├── analyzer/          통계 계산
+│       │   ├── judgment/          특가 판단 Rule Engine
+│       │   ├── alert/             알림 평가
+│       │   └── event/             FareCollectedEvent
+│       ├── infrastructure/        외부 연동 구현체
+│       │   ├── collector/         MockFareCollector, SerpApiFareCollector
+│       │   ├── notification/      Log/Email NotificationSender
+│       │   └── scheduler/         @Scheduled 수집 트리거
+│       └── api/                   REST 컨트롤러
+│           ├── route/             노선 CRUD
+│           ├── fare/              가격 히스토리/통계
+│           ├── judgment/          판단 결과
+│           ├── search/            실시간 검색
+│           ├── airport/           공항 자동완성
+│           ├── alert/             알림 규칙/이력
+│           └── common/            ApiResponse, CORS, 예외 핸들러
+└── frontend/
+    ├── Dockerfile
+    ├── package.json
+    └── src/
+        ├── app/                   페이지 (/, /search, /routes/[id], /notifications)
+        ├── components/            UI 컴포넌트
+        ├── lib/api/               API 클라이언트
+        └── types/                 TypeScript 타입 정의
 ```
 
 ## 시작하기
 
-### 사전 요구사항
-
-- **JDK 21+** (`java -version` 으로 확인)
-- Git
-
-### 백엔드 실행
+### 방법 1: Docker Compose (권장)
 
 ```bash
 git clone https://github.com/hanhyur/farewatch.git
 cd farewatch
-./gradlew :backend:bootRun
+
+# (선택) SerpApi 실연동 시 .env 파일 생성
+cp .env.example .env
+# .env에 FAREWATCH_COLLECTOR_SERPAPI_API_KEY 설정
+
+# 풀스택 기동 (PostgreSQL + Backend + Frontend)
+docker compose up -d
 ```
 
-기동 확인:
-```
-Started FarewatchApplication in X.XXX seconds
-Tomcat started on port 8080 (http)
-```
-
-### 접근 가능한 엔드포인트
-
-| URL | 용도 |
-|-----|------|
-| [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html) | Swagger UI (API 탐색) |
-| [http://localhost:8080/v3/api-docs](http://localhost:8080/v3/api-docs) | OpenAPI 3 JSON |
-| [http://localhost:8080/h2-console](http://localhost:8080/h2-console) | H2 웹 콘솔 |
-
-H2 콘솔 접속 정보:
-- JDBC URL: `jdbc:h2:mem:farewatch`
-- User: `sa`
-- Password: *(빈칸)*
-
-### 테스트 실행
+| 서비스 | URL |
+|--------|-----|
+| Frontend | http://localhost:3000 |
+| Backend API | http://localhost:8080 |
+| Swagger UI | http://localhost:8080/swagger-ui.html |
 
 ```bash
-# 루트에서 모든 서브프로젝트 테스트
-./gradlew test
-
-# backend 만 콕 집어서
-./gradlew :backend:test
+docker compose logs -f        # 실시간 로그
+docker compose down            # 중지
+docker compose down -v         # 중지 + DB 데이터 삭제
 ```
 
-## REST API (계획)
+### 방법 2: 로컬 개발
 
-v0 의 공용 응답 래퍼:
+```bash
+# 백엔드 (H2 + Mock 수집기)
+./gradlew :backend:bootRun
 
+# 백엔드 (시드 데이터 포함)
+./gradlew :backend:bootRun --args='--spring.profiles.active=dev'
+
+# 프론트엔드
+cd frontend
+npm install
+npm run dev
+```
+
+### SerpApi 실연동
+
+1. [SerpApi](https://serpapi.com/)에서 API 키 발급 (무료 250회/월)
+2. `backend/src/main/resources/application-local.yml` 생성:
+   ```yaml
+   farewatch:
+     collector:
+       serpapi:
+         api-key: YOUR_API_KEY
+   ```
+3. `--spring.profiles.active=local` 또는 Docker의 `.env` 파일에 설정
+4. 키가 감지되면 `MockFareCollector` 대신 `SerpApiFareCollector`가 자동 활성화
+
+### 프로파일 매트릭스
+
+| 프로파일 | DB | 수집기 | 시드 데이터 | 이메일 |
+|---|---|---|---|---|
+| (기본) | H2 | Mock | X | X |
+| dev | H2 | Mock | O | X |
+| local | H2 | SerpApi | X | 설정 시 |
+| docker | PostgreSQL | .env에 따라 | X | 설정 시 |
+| docker,dev | PostgreSQL | .env에 따라 | O | 설정 시 |
+
+## REST API
+
+모든 응답은 공통 래퍼:
 ```json
-{
-  "success": true,
-  "data": { ... },
-  "timestamp": "2026-04-09T14:22:00Z"
-}
+{ "success": true, "data": { ... }, "timestamp": "2026-04-13T14:22:00Z" }
 ```
-
-### 주요 엔드포인트
 
 | Method | Path | 설명 |
 |--------|------|------|
-| `GET` | `/api/v1/routes` | 노선 목록 |
+| `GET` | `/api/v1/routes` | 노선 목록 (origin/destination/active 필터) |
+| `POST` | `/api/v1/routes` | 노선 등록 |
+| `DELETE` | `/api/v1/routes/{id}` | 노선 비활성화 |
 | `GET` | `/api/v1/routes/{id}/fares` | 가격 히스토리 |
 | `GET` | `/api/v1/routes/{id}/statistics` | 통계 조회 |
 | `GET` | `/api/v1/routes/{id}/judgment` | **판단 결과** (핵심) |
+| `GET` | `/api/v1/search` | 실시간 항공편 검색 (왕복/편도, 직항/경유) |
+| `GET` | `/api/v1/airports?q=` | 공항 자동완성 (한/영 도시명, IATA 코드) |
 | `POST` | `/api/v1/alert-rules` | 알림 규칙 등록 |
 | `GET` | `/api/v1/alert-rules` | 알림 규칙 목록 |
-| `DELETE` | `/api/v1/alert-rules/{id}` | 알림 규칙 soft delete |
+| `DELETE` | `/api/v1/alert-rules/{id}` | 알림 규칙 삭제 |
 | `GET` | `/api/v1/notifications` | 알림 이력 |
-
-판단 결과 응답 예시:
-```json
-{
-  "success": true,
-  "data": {
-    "routeId": 1,
-    "verdict": "CHEAP",
-    "currentPrice": 178000,
-    "avgPrice": 232000,
-    "minPrice": 154000,
-    "stdDeviation": 28500.0,
-    "zScore": -1.89,
-    "suggestion": "지금 구매를 추천합니다"
-  },
-  "timestamp": "2026-04-09T14:22:00Z"
-}
-```
 
 ## 설계 원칙
 
 ### Domain-Driven Design (DDD)
-- **Aggregate Root 5개**: `Route`, `FareSnapshot`, `FareStatistics`, `AlertRule`, `Notification`
-- **교차 참조는 ID 만** — `@ManyToOne`/`@OneToMany` 금지 (Vernon 스타일)
-- **Value Object** (`record` + `@Embeddable`): `AirportCode`, `Money`, `DateRange`, `EmailAddress`
-- **Sealed Interface**: `FareVerdict` — Java 21 pattern matching 으로 exhaustiveness 보장
-- **생성자 기반 invariant**: 모든 엔티티는 `protected` 무인자 생성자 + `public static` 팩토리 + 검증
+- **Aggregate Root 5개**: Route, FareSnapshot, FareStatistics, AlertRule, Notification
+- **교차 참조는 ID 만** — `@ManyToOne`/`@OneToMany` 사용 안 함
+- **Value Object** (`record` + `@Embeddable`): AirportCode, Money, DateRange, EmailAddress
+- **Sealed Interface**: FareVerdict — Java 21 pattern matching으로 exhaustiveness 보장
+
+### 인터페이스 기반 추상화
+- `FareCollector` — 수집기 추상화 (Mock / SerpApi)
+- `NotificationSender` — 발송기 추상화 (Log / Email)
+- `@ConditionalOnProperty` / `@ConditionalOnMissingBean`으로 자동 전환
 
 ### 테스트 주도 개발 (TDD)
-- **RED → GREEN → REFACTOR** 사이클 엄수
-- **@DataJpaTest** 로 레포지토리 slice 테스트 (H2)
-- **단위 테스트** 는 Spring context 없이 pure JUnit 5
+- RED → GREEN → REFACTOR 사이클
+- 80+ 단위/통합 테스트
+- `@DataJpaTest`로 레포지토리 슬라이스 테스트
 
-### 개발 순서
-1. **Phase 1 — 백엔드**
-   - [x] Gradle + Spring Boot 부트스트랩
-   - [x] 도메인 엔티티 5개 + Repository
-   - [ ] Rule Engine (z-score 판단 로직)
-   - [ ] Mock FareCollector + Scheduler
-   - [ ] 이벤트 파이프라인 (통계 재계산 + 알림 평가)
-   - [ ] REST API + 공용 응답 래퍼
-2. **Phase 2 — 프론트엔드**
-   - [ ] Next.js 프로젝트 세팅
-   - [ ] 메인 대시보드 / 노선 상세 / 알림 등록 / 이력 4페이지
+## 테스트
+
+```bash
+./gradlew :backend:test                    # 전체 백엔드 테스트
+./gradlew :backend:test --tests "*.judgment.*"  # 특정 패키지만
+./gradlew :backend:jacocoTestReport        # 커버리지 리포트
+```
 
 ## 브랜치 전략
 
 ```
-main         ← 릴리스/안정
- └─ dev      ← 통합 브랜치 (피처 병합 대상)
-     └─ feat/*   ← 피처 브랜치 (dev에서 분기)
+main         ← 안정 브랜치
+ └─ feat/*   ← 피처 브랜치 (main에서 분기, PR로 병합)
 ```
 
-- `main` 직접 푸시 금지, `dev` 통해서만 릴리스
-- 피처 브랜치는 `dev` 에서 분기, PR 통해 `dev` 로 병합
-- Conventional Commits (`feat(backend): ...`, `fix: ...`, `chore: ...`)
-
-## 기여하기
-
-```bash
-# 1. dev 브랜치에서 피처 브랜치 생성
-git checkout dev
-git pull
-git checkout -b feat/my-feature
-
-# 2. TDD 사이클
-# - 실패하는 테스트 작성 (RED)
-# - 최소 구현 (GREEN)
-# - 리팩토링 (REFACTOR)
-
-# 3. 빌드 + 테스트 확인
-./gradlew :backend:build
-
-# 4. PR 생성 (dev 기준)
-```
+Conventional Commits: `feat:`, `fix:`, `refactor:`, `chore:`, `docs:`
 
 ## License
 
 MIT
-
-## 참고
-
-- Planner/설계 문서는 로컬에서만 관리됩니다 (`docs/` 는 gitignored).
-- 현재 수집기는 Mock 구현만 존재합니다. 실제 항공권 API 연동은 인터페이스 교체로 예정.
