@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { use } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -17,6 +18,12 @@ import {
 } from "@/lib/api/routes";
 import { formatKrw, formatRouteName } from "@/lib/format";
 
+function todayPlusDays(n: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return d.toISOString().split("T")[0];
+}
+
 interface RouteDetailPageProps {
   params: Promise<{ id: string }>;
 }
@@ -25,25 +32,27 @@ export default function RouteDetailPage({ params }: RouteDetailPageProps) {
   const { id } = use(params);
   const routeId = Number(id);
 
+  const [departureDate, setDepartureDate] = useState(todayPlusDays(7));
+
   const route = useQuery({
     queryKey: ["route", routeId],
     queryFn: () => fetchRoute(routeId),
     enabled: Number.isFinite(routeId),
   });
   const judgment = useQuery({
-    queryKey: ["judgment", routeId],
-    queryFn: () => fetchJudgment(routeId),
+    queryKey: ["judgment", routeId, departureDate],
+    queryFn: () => fetchJudgment(routeId, departureDate),
     enabled: Number.isFinite(routeId),
     refetchInterval: 5 * 60 * 1000,
   });
   const fares = useQuery({
-    queryKey: ["fares", routeId],
-    queryFn: () => fetchFares(routeId),
+    queryKey: ["fares", routeId, departureDate],
+    queryFn: () => fetchFares(routeId, departureDate),
     enabled: Number.isFinite(routeId),
   });
   const statistics = useQuery({
-    queryKey: ["statistics", routeId],
-    queryFn: () => fetchStatistics(routeId),
+    queryKey: ["statistics", routeId, departureDate],
+    queryFn: () => fetchStatistics(routeId, departureDate),
     enabled: Number.isFinite(routeId),
     retry: false,
   });
@@ -99,45 +108,55 @@ export default function RouteDetailPage({ params }: RouteDetailPageProps) {
         ) : null}
       </Card>
 
-      <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
-        <Card className="p-6">
-          <h2 className="text-lg font-semibold tracking-tight">
-            가격 히스토리
-          </h2>
-          <p className="mb-4 text-sm text-[var(--color-text-secondary)]">
-            최근 수집된 가격 변동 추이
-          </p>
-          {fares.isLoading ? (
-            <Skeleton className="h-64 w-full" />
-          ) : fares.isError || !fares.data ? (
-            <p className="text-sm text-[var(--color-danger)]">
-              가격 히스토리를 불러올 수 없어요
-            </p>
-          ) : (
-            <FareHistoryChart snapshots={fares.data} />
-          )}
-        </Card>
-
-        <Card className="p-6">
-          <h2 className="text-lg font-semibold tracking-tight">통계</h2>
-          <p className="mb-5 text-sm text-[var(--color-text-secondary)]">
-            집계된 가격 통계
-          </p>
-          {statistics.isLoading ? (
-            <div className="grid grid-cols-2 gap-4">
-              {Array.from({ length: 6 }).map((_, idx) => (
-                <Skeleton key={idx} className="h-12 w-full" />
-              ))}
-            </div>
-          ) : statistics.isError || !statistics.data ? (
-            <p className="text-sm text-[var(--color-text-tertiary)]">
-              아직 통계가 없어요
-            </p>
-          ) : (
-            <StatisticsPanel statistics={statistics.data} />
-          )}
-        </Card>
+      {/* 출발일 선택 */}
+      <div className="flex items-center gap-3">
+        <label
+          htmlFor="departureDate"
+          className="text-sm font-medium text-[var(--color-text-secondary)]"
+        >
+          출발일
+        </label>
+        <input
+          id="departureDate"
+          type="date"
+          value={departureDate}
+          onChange={(e) => setDepartureDate(e.target.value)}
+          min={todayPlusDays(0)}
+          className="form-input w-auto"
+        />
       </div>
+
+      {/* 통계 — 가로 한 줄 */}
+      {statistics.isLoading ? (
+        <Card className="p-5">
+          <div className="flex gap-6">
+            {Array.from({ length: 5 }).map((_, idx) => (
+              <Skeleton key={idx} className="h-10 w-20" />
+            ))}
+          </div>
+        </Card>
+      ) : statistics.data ? (
+        <StatisticsPanel statistics={statistics.data} />
+      ) : null}
+
+      {/* 차트 — 전체 너비 */}
+      <Card className="p-6">
+        <h2 className="text-lg font-semibold tracking-tight">
+          가격 히스토리
+        </h2>
+        <p className="mb-4 text-sm text-[var(--color-text-secondary)]">
+          최근 수집된 가격 변동 추이
+        </p>
+        {fares.isLoading ? (
+          <Skeleton className="h-80 w-full" />
+        ) : fares.isError || !fares.data ? (
+          <p className="text-sm text-[var(--color-danger)]">
+            가격 히스토리를 불러올 수 없어요
+          </p>
+        ) : (
+          <FareHistoryChart snapshots={fares.data} />
+        )}
+      </Card>
 
       <Card className="p-6">
         <h2 className="text-lg font-semibold tracking-tight">알림 설정</h2>

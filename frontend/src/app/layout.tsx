@@ -49,6 +49,12 @@ export default function RootLayout({
                   대시보드
                 </Link>
                 <Link
+                  href="/search"
+                  className="rounded-full px-3 py-1.5 hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)]"
+                >
+                  검색
+                </Link>
+                <Link
                   href="/notifications"
                   className="rounded-full px-3 py-1.5 hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)]"
                 >
@@ -57,7 +63,7 @@ export default function RootLayout({
               </nav>
             </div>
           </header>
-          <main className="mx-auto w-full max-w-6xl flex-1 px-5 py-10">
+          <main className="mx-auto w-full max-w-5xl flex-1 px-5 py-6">
             {children}
           </main>
           <footer className="border-t border-[var(--color-border)] py-6">

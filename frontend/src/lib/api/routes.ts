@@ -41,3 +41,14 @@ export function fetchStatistics(
     query: { departureDate },
   });
 }
+
+export function createRoute(input: {
+  origin: string;
+  destination: string;
+  airlineCode: string | null;
+}): Promise<Route> {
+  return apiRequest<Route>("/api/v1/routes", {
+    method: "POST",
+    body: input,
+  });
+}

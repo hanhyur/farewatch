@@ -16,5 +16,40 @@ services:
       timeout: 3s
       retries: 5
 
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: farewatch-backend
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker,dev
+      FAREWATCH_COLLECTION_INTERVAL_MS: 43200000  # 12시간 (2노선x2출발일x2회/일=8회/일≈240회/월)
+      FAREWATCH_COLLECTION_TARGET_DAY_OFFSETS: 7,14  # 출발일 2개만
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/farewatch
+      SPRING_DATASOURCE_USERNAME: farewatch
+      SPRING_DATASOURCE_PASSWORD: farewatch
+    env_file:
+      - path: .env
+        required: false
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: frontend
+      dockerfile: Dockerfile
+    container_name: farewatch-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:8080
+    depends_on:
+      - backend
+    restart: unless-stopped
+
 volumes:
   farewatch-pgdata:

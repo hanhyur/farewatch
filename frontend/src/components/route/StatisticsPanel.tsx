@@ -1,3 +1,4 @@
+import { Card } from "@/components/ui/Card";
 import { formatKrw } from "@/lib/format";
 import type { FareStatistics } from "@/types/api";
 
@@ -5,50 +6,28 @@ interface StatisticsPanelProps {
   statistics: FareStatistics;
 }
 
-interface StatItem {
-  label: string;
-  value: string;
-}
-
 export function StatisticsPanel({ statistics }: StatisticsPanelProps) {
-  const items: StatItem[] = [
+  const items = [
     { label: "평균", value: formatKrw(statistics.avgPrice) },
     { label: "최저", value: formatKrw(statistics.minPrice) },
     { label: "최고", value: formatKrw(statistics.maxPrice) },
+    { label: "표본 수", value: `${statistics.sampleCount}건` },
     {
       label: "표준편차",
-      value: statistics.stdDeviation
-        ? formatKrw(statistics.stdDeviation)
-        : "—",
-    },
-    {
-      label: "P25",
-      value: statistics.p25Price !== null ? formatKrw(statistics.p25Price) : "—",
-    },
-    {
-      label: "P75",
-      value: statistics.p75Price !== null ? formatKrw(statistics.p75Price) : "—",
+      value: statistics.stdDeviation ? formatKrw(statistics.stdDeviation) : "—",
     },
   ];
 
   return (
-    <dl className="grid grid-cols-2 gap-5 sm:grid-cols-3">
+    <Card className="flex flex-wrap items-center gap-x-8 gap-y-3 p-5">
       {items.map((item) => (
-        <div key={item.label} className="flex flex-col gap-1">
-          <dt className="text-xs font-medium text-[var(--color-text-tertiary)]">
+        <div key={item.label}>
+          <dt className="text-[11px] font-medium text-[var(--color-text-tertiary)]">
             {item.label}
           </dt>
-          <dd className="text-lg font-semibold tabular-nums">{item.value}</dd>
+          <dd className="text-base font-semibold tabular-nums">{item.value}</dd>
         </div>
       ))}
-      <div className="flex flex-col gap-1">
-        <dt className="text-xs font-medium text-[var(--color-text-tertiary)]">
-          표본 수
-        </dt>
-        <dd className="text-lg font-semibold tabular-nums">
-          {statistics.sampleCount}건
-        </dd>
-      </div>
-    </dl>
+    </Card>
   );
 }

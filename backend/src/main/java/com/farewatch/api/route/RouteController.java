@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.stream.Stream;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -35,18 +37,33 @@ public class RouteController {
         this.routeRepository = routeRepository;
     }
 
-    /** 모든 노선 (활성/비활성 포함) 을 ID 오름차순으로 반환. */
+    /** 노선 목록 (필터 지원). */
     @Operation(
             summary = "노선 목록",
-            description = "등록된 모든 노선을 ID 오름차순으로 반환한다. 활성/비활성 모두 포함.")
+            description = "등록된 노선을 필터링하여 ID 오름차순으로 반환한다. 모든 파라미터는 선택.")
     @ApiResponses(@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200"))
     @GetMapping
-    public ApiResponse<List<RouteResponse>> list() {
-        List<RouteResponse> body =
-                routeRepository.findAll().stream()
-                        .sorted((a, b) -> Long.compare(a.getId(), b.getId()))
-                        .map(RouteResponse::from)
-                        .toList();
+    public ApiResponse<List<RouteResponse>> list(
+            @Parameter(description = "출발 공항 IATA 코드") @RequestParam(required = false) String origin,
+            @Parameter(description = "도착 공항 IATA 코드") @RequestParam(required = false) String destination,
+            @Parameter(description = "활성 상태 필터") @RequestParam(required = false) Boolean active) {
+
+        Stream<Route> stream = routeRepository.findAll().stream()
+                .sorted((a, b) -> Long.compare(a.getId(), b.getId()));
+
+        if (origin != null && !origin.isBlank()) {
+            String o = origin.toUpperCase().trim();
+            stream = stream.filter(r -> r.getOrigin().value().equals(o));
+        }
+        if (destination != null && !destination.isBlank()) {
+            String d = destination.toUpperCase().trim();
+            stream = stream.filter(r -> r.getDestination().value().equals(d));
+        }
+        if (active != null) {
+            stream = stream.filter(r -> r.isActive() == active);
+        }
+
+        List<RouteResponse> body = stream.map(RouteResponse::from).toList();
         return ApiResponse.ok(body);
     }
 
