@@ -47,4 +47,25 @@ public interface FareSnapshotRepository extends JpaRepository<FareSnapshot, Long
                     + "WHERE s.routeId = :routeId AND s.departureDate = :departureDate")
     List<Long> findPricesByRouteIdAndDepartureDate(
             @Param("routeId") Long routeId, @Param("departureDate") LocalDate departureDate);
+
+    /** 특정 노선+출발일의 역대 최저가 스냅샷. */
+    @Query(
+            "SELECT s FROM FareSnapshot s "
+                    + "WHERE s.routeId = :routeId AND s.departureDate = :departureDate "
+                    + "ORDER BY s.price.amount ASC, s.collectedAt ASC")
+    List<FareSnapshot> findAllTimeLowest(
+            @Param("routeId") Long routeId,
+            @Param("departureDate") LocalDate departureDate,
+            Pageable pageable);
+
+    /** 특정 노선+출발일에서 수집 시각 기준으로 기간 필터 조회. */
+    @Query(
+            "SELECT s FROM FareSnapshot s "
+                    + "WHERE s.routeId = :routeId AND s.departureDate = :departureDate "
+                    + "AND s.collectedAt >= :since "
+                    + "ORDER BY s.collectedAt ASC")
+    List<FareSnapshot> findByRouteIdAndDepartureDateSince(
+            @Param("routeId") Long routeId,
+            @Param("departureDate") LocalDate departureDate,
+            @Param("since") java.time.LocalDateTime since);
 }

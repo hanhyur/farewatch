@@ -7,7 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { VerdictBadge } from "@/components/verdict/VerdictBadge";
-import { FareHistoryChart } from "@/components/route/FareHistoryChart";
+import { FareHistoryChart, type ChartPeriod } from "@/components/route/FareHistoryChart";
 import { StatisticsPanel } from "@/components/route/StatisticsPanel";
 import { AlertRuleForm } from "@/components/alert/AlertRuleForm";
 import {
@@ -24,6 +24,13 @@ function todayPlusDays(n: number): string {
   return d.toISOString().split("T")[0];
 }
 
+const PERIOD_DAYS: Record<ChartPeriod, number> = {
+  "1W": 7,
+  "1M": 30,
+  "6M": 180,
+  "1Y": 365,
+};
+
 interface RouteDetailPageProps {
   params: Promise<{ id: string }>;
 }
@@ -33,6 +40,7 @@ export default function RouteDetailPage({ params }: RouteDetailPageProps) {
   const routeId = Number(id);
 
   const [departureDate, setDepartureDate] = useState(todayPlusDays(7));
+  const [chartPeriod, setChartPeriod] = useState<ChartPeriod>("1W");
 
   const route = useQuery({
     queryKey: ["route", routeId],
@@ -46,9 +54,16 @@ export default function RouteDetailPage({ params }: RouteDetailPageProps) {
     refetchInterval: 5 * 60 * 1000,
   });
   const fares = useQuery({
-    queryKey: ["fares", routeId, departureDate],
-    queryFn: () => fetchFares(routeId, departureDate),
+    queryKey: ["fares", routeId, departureDate, chartPeriod],
+    queryFn: () => fetchFares(routeId, departureDate, { days: PERIOD_DAYS[chartPeriod] }),
     enabled: Number.isFinite(routeId),
+  });
+  // 전체 데이터 범위 파악용 (탭 활성/비활성 판단)
+  const allFares = useQuery({
+    queryKey: ["fares-all", routeId, departureDate],
+    queryFn: () => fetchFares(routeId, departureDate, { days: 365 }),
+    enabled: Number.isFinite(routeId),
+    staleTime: 60_000,
   });
   const statistics = useQuery({
     queryKey: ["statistics", routeId, departureDate],
@@ -126,7 +141,7 @@ export default function RouteDetailPage({ params }: RouteDetailPageProps) {
         />
       </div>
 
-      {/* 통계 — 가로 한 줄 */}
+      {/* 통계 */}
       {statistics.isLoading ? (
         <Card className="p-5">
           <div className="flex gap-6">
@@ -139,14 +154,11 @@ export default function RouteDetailPage({ params }: RouteDetailPageProps) {
         <StatisticsPanel statistics={statistics.data} />
       ) : null}
 
-      {/* 차트 — 전체 너비 */}
+      {/* 차트 */}
       <Card className="p-6">
-        <h2 className="text-lg font-semibold tracking-tight">
+        <h2 className="mb-4 text-lg font-semibold tracking-tight">
           가격 히스토리
         </h2>
-        <p className="mb-4 text-sm text-[var(--color-text-secondary)]">
-          최근 수집된 가격 변동 추이
-        </p>
         {fares.isLoading ? (
           <Skeleton className="h-80 w-full" />
         ) : fares.isError || !fares.data ? (
@@ -154,7 +166,19 @@ export default function RouteDetailPage({ params }: RouteDetailPageProps) {
             가격 히스토리를 불러올 수 없어요
           </p>
         ) : (
-          <FareHistoryChart snapshots={fares.data} />
+          <FareHistoryChart
+            snapshots={fares.data}
+            statistics={statistics.data ?? null}
+            period={chartPeriod}
+            onPeriodChange={setChartPeriod}
+            totalDataSpanDays={
+              allFares.data && allFares.data.length >= 2
+                ? (new Date(allFares.data[allFares.data.length - 1].collectedAt).getTime() -
+                    new Date(allFares.data[0].collectedAt).getTime()) /
+                  (1000 * 60 * 60 * 24)
+                : 0
+            }
+          />
         )}
       </Card>
 

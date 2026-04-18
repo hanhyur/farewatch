@@ -26,10 +26,14 @@ export function fetchJudgment(
 export function fetchFares(
   id: number,
   departureDate?: string,
-  limit = 30,
+  options?: { days?: number; limit?: number },
 ): Promise<FareSnapshot[]> {
   return apiRequest<FareSnapshot[]>(`/api/v1/routes/${id}/fares`, {
-    query: { departureDate, limit },
+    query: {
+      departureDate,
+      days: options?.days,
+      limit: options?.days ? undefined : (options?.limit ?? 30),
+    },
   });
 }
 

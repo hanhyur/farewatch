@@ -51,6 +51,8 @@ export interface FareStatistics {
   p25Price: number | null;
   p75Price: number | null;
   calculatedAt: string;
+  allTimeLowPrice: number | null;
+  allTimeLowDate: string | null;
 }
 
 export type VerdictTrigger = "CHEAP" | "CHEAP_OR_FAIR";

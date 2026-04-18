@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -77,20 +78,32 @@ public class FareController {
                     @RequestParam(required = false)
                     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
                     LocalDate departureDate,
-            @Parameter(description = "최대 결과 수 (기본 100, 최대 500)")
+            @Parameter(description = "조회 기간 (일). 7/30/180/365. 생략 시 limit 기반 조회")
+                    @RequestParam(required = false)
+                    Integer days,
+            @Parameter(description = "최대 결과 수 (기본 100, 최대 500). days 지정 시 무시됨")
                     @RequestParam(required = false)
                     Integer limit) {
         ensureRouteExists(id);
         LocalDate target = (departureDate != null) ? departureDate : defaultDepartureDate();
-        int pageSize = clampLimit(limit);
 
-        List<FareSnapshotResponse> body =
-                snapshotRepository
-                        .findByRouteIdAndDepartureDateOrderByCollectedAtDesc(
-                                id, target, PageRequest.of(0, pageSize))
-                        .stream()
-                        .map(FareSnapshotResponse::from)
-                        .toList();
+        List<FareSnapshotResponse> body;
+        if (days != null && days > 0) {
+            LocalDateTime since = LocalDateTime.now(clock).minusDays(days);
+            body = snapshotRepository
+                    .findByRouteIdAndDepartureDateSince(id, target, since)
+                    .stream()
+                    .map(FareSnapshotResponse::from)
+                    .toList();
+        } else {
+            int pageSize = clampLimit(limit);
+            body = snapshotRepository
+                    .findByRouteIdAndDepartureDateOrderByCollectedAtDesc(
+                            id, target, PageRequest.of(0, pageSize))
+                    .stream()
+                    .map(FareSnapshotResponse::from)
+                    .toList();
+        }
         return ApiResponse.ok(body);
     }
 
@@ -113,10 +126,9 @@ public class FareController {
         ensureRouteExists(id);
         LocalDate target = (departureDate != null) ? departureDate : defaultDepartureDate();
 
-        return statisticsRepository
+        FareStatisticsResponse stats = statisticsRepository
                 .findByRouteIdAndDepartureDate(id, target)
                 .map(FareStatisticsResponse::from)
-                .map(ApiResponse::ok)
                 .orElseThrow(
                         () ->
                                 new ResourceNotFoundException(
@@ -124,6 +136,14 @@ public class FareController {
                                                 + id
                                                 + ", departureDate="
                                                 + target));
+
+        // 역대 최저가 채우기
+        var lowest = snapshotRepository.findAllTimeLowest(id, target, PageRequest.of(0, 1));
+        if (!lowest.isEmpty()) {
+            var snap = lowest.getFirst();
+            stats = stats.withAllTimeLow(snap.getPrice().amount(), snap.getCollectedAt());
+        }
+        return ApiResponse.ok(stats);
     }
 
     private void ensureRouteExists(Long routeId) {
