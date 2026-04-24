@@ -42,13 +42,6 @@ bin/
 ### Mac OS ###
 .DS_Store
 
-### AI / Claude (local workflow files, never committed) ###
-.claude/
-CLAUDE.md
-
-### Local development docs (never committed) ###
-docs/
-
 ### Local secrets (API keys, credentials) ###
 .env
 application-local.yml
